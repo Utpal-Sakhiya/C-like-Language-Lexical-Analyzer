@@ -1,0 +1,270 @@
+C-Like Language Lexical Analyzer - Analysis Report
+Generated: 2026-10-29 22:08:37
+
+==[ ANALYSIS SUMMARY ]==============================================
+  Source file        : C:\Users\Utpal\OneDrive\Desktop\files\CLexer\samples\valid_program.c
+  Lines scanned      : 33
+  Tokens found       : 179
+  Unique identifiers : 17
+  Comments skipped   : 2
+  Errors             : 0
+  Warnings           : 0
+  Result             : PASSED - source is lexically valid
+
+==[ SOURCE LISTING  ('>' marks lines with problems) ]===============
+      1 | /* Sample program: student marks and factorial
+      2 |    Demonstrates keywords, literals, operators and comments */
+      3 | #include <stdio.h>
+      4 | #define MAX_SIZE 10
+      5 | 
+      6 | typedef struct {
+      7 |     char name[20];
+      8 |     float marks;
+      9 | } Student;
+     10 | 
+     11 | int factorial(int n) {
+     12 |     if (n <= 1)
+     13 |         return 1;
+     14 |     return n * factorial(n - 1);   // recursive call
+     15 | }
+     16 | 
+     17 | int main(void) {
+     18 |     int values[MAX_SIZE] = {1, 2, 3, 4, 5};
+     19 |     unsigned long total = 0UL;
+     20 |     double avg = 0.0, scale = 2.5e-1;
+     21 |     char grade = 'A', newline = '\n';
+     22 |     int mask = 0x1F, perms = 0755;
+     23 | 
+     24 |     for (int i = 0; i < 5; i++) {
+     25 |         total += values[i];
+     26 |         values[i] <<= 1;
+     27 |     }
+     28 |     avg = (double) total / 5;
+     29 |     if (avg >= 3.0 && grade != 'F')
+     30 |         printf("Average: %.2f\tScaled: %f\n", avg, avg * scale);
+     31 |     printf("5! = %d, mask & perms = %d\n", factorial(5), mask & perms);
+     32 |     return 0;
+     33 | }
+
+==[ TOKEN STREAM ]==================================================
+  #     LINE:COL   TOKEN TYPE       LEXEME
+  --------------------------------------------------------------------
+  1     3:1        PREPROCESSOR     #include <stdio.h>
+  2     4:1        PREPROCESSOR     #define MAX_SIZE 10
+  3     6:1        KEYWORD          typedef
+  4     6:9        KEYWORD          struct
+  5     6:16       PUNCTUATOR       {
+  6     7:5        KEYWORD          char
+  7     7:10       IDENTIFIER       name
+  8     7:14       PUNCTUATOR       [
+  9     7:15       INTEGER_CONST    20
+  10    7:17       PUNCTUATOR       ]
+  11    7:18       PUNCTUATOR       ;
+  12    8:5        KEYWORD          float
+  13    8:11       IDENTIFIER       marks
+  14    8:16       PUNCTUATOR       ;
+  15    9:1        PUNCTUATOR       }
+  16    9:3        IDENTIFIER       Student
+  17    9:10       PUNCTUATOR       ;
+  18    11:1       KEYWORD          int
+  19    11:5       IDENTIFIER       factorial
+  20    11:14      PUNCTUATOR       (
+  21    11:15      KEYWORD          int
+  22    11:19      IDENTIFIER       n
+  23    11:20      PUNCTUATOR       )
+  24    11:22      PUNCTUATOR       {
+  25    12:5       KEYWORD          if
+  26    12:8       PUNCTUATOR       (
+  27    12:9       IDENTIFIER       n
+  28    12:11      OPERATOR         <=
+  29    12:14      INTEGER_CONST    1
+  30    12:15      PUNCTUATOR       )
+  31    13:9       KEYWORD          return
+  32    13:16      INTEGER_CONST    1
+  33    13:17      PUNCTUATOR       ;
+  34    14:5       KEYWORD          return
+  35    14:12      IDENTIFIER       n
+  36    14:14      OPERATOR         *
+  37    14:16      IDENTIFIER       factorial
+  38    14:25      PUNCTUATOR       (
+  39    14:26      IDENTIFIER       n
+  40    14:28      OPERATOR         -
+  41    14:30      INTEGER_CONST    1
+  42    14:31      PUNCTUATOR       )
+  43    14:32      PUNCTUATOR       ;
+  44    15:1       PUNCTUATOR       }
+  45    17:1       KEYWORD          int
+  46    17:5       IDENTIFIER       main
+  47    17:9       PUNCTUATOR       (
+  48    17:10      KEYWORD          void
+  49    17:14      PUNCTUATOR       )
+  50    17:16      PUNCTUATOR       {
+  51    18:5       KEYWORD          int
+  52    18:9       IDENTIFIER       values
+  53    18:15      PUNCTUATOR       [
+  54    18:16      IDENTIFIER       MAX_SIZE
+  55    18:24      PUNCTUATOR       ]
+  56    18:26      OPERATOR         =
+  57    18:28      PUNCTUATOR       {
+  58    18:29      INTEGER_CONST    1
+  59    18:30      PUNCTUATOR       ,
+  60    18:32      INTEGER_CONST    2
+  61    18:33      PUNCTUATOR       ,
+  62    18:35      INTEGER_CONST    3
+  63    18:36      PUNCTUATOR       ,
+  64    18:38      INTEGER_CONST    4
+  65    18:39      PUNCTUATOR       ,
+  66    18:41      INTEGER_CONST    5
+  67    18:42      PUNCTUATOR       }
+  68    18:43      PUNCTUATOR       ;
+  69    19:5       KEYWORD          unsigned
+  70    19:14      KEYWORD          long
+  71    19:19      IDENTIFIER       total
+  72    19:25      OPERATOR         =
+  73    19:27      INTEGER_CONST    0UL
+  74    19:30      PUNCTUATOR       ;
+  75    20:5       KEYWORD          double
+  76    20:12      IDENTIFIER       avg
+  77    20:16      OPERATOR         =
+  78    20:18      FLOAT_CONST      0.0
+  79    20:21      PUNCTUATOR       ,
+  80    20:23      IDENTIFIER       scale
+  81    20:29      OPERATOR         =
+  82    20:31      FLOAT_CONST      2.5e-1
+  83    20:37      PUNCTUATOR       ;
+  84    21:5       KEYWORD          char
+  85    21:10      IDENTIFIER       grade
+  86    21:16      OPERATOR         =
+  87    21:18      CHAR_CONST       'A'
+  88    21:21      PUNCTUATOR       ,
+  89    21:23      IDENTIFIER       newline
+  90    21:31      OPERATOR         =
+  91    21:33      CHAR_CONST       '\n'
+  92    21:37      PUNCTUATOR       ;
+  93    22:5       KEYWORD          int
+  94    22:9       IDENTIFIER       mask
+  95    22:14      OPERATOR         =
+  96    22:16      INTEGER_CONST    0x1F
+  97    22:20      PUNCTUATOR       ,
+  98    22:22      IDENTIFIER       perms
+  99    22:28      OPERATOR         =
+  100   22:30      INTEGER_CONST    0755
+  101   22:34      PUNCTUATOR       ;
+  102   24:5       KEYWORD          for
+  103   24:9       PUNCTUATOR       (
+  104   24:10      KEYWORD          int
+  105   24:14      IDENTIFIER       i
+  106   24:16      OPERATOR         =
+  107   24:18      INTEGER_CONST    0
+  108   24:19      PUNCTUATOR       ;
+  109   24:21      IDENTIFIER       i
+  110   24:23      OPERATOR         <
+  111   24:25      INTEGER_CONST    5
+  112   24:26      PUNCTUATOR       ;
+  113   24:28      IDENTIFIER       i
+  114   24:29      OPERATOR         ++
+  115   24:31      PUNCTUATOR       )
+  116   24:33      PUNCTUATOR       {
+  117   25:9       IDENTIFIER       total
+  118   25:15      OPERATOR         +=
+  119   25:18      IDENTIFIER       values
+  120   25:24      PUNCTUATOR       [
+  121   25:25      IDENTIFIER       i
+  122   25:26      PUNCTUATOR       ]
+  123   25:27      PUNCTUATOR       ;
+  124   26:9       IDENTIFIER       values
+  125   26:15      PUNCTUATOR       [
+  126   26:16      IDENTIFIER       i
+  127   26:17      PUNCTUATOR       ]
+  128   26:19      OPERATOR         <<=
+  129   26:23      INTEGER_CONST    1
+  130   26:24      PUNCTUATOR       ;
+  131   27:5       PUNCTUATOR       }
+  132   28:5       IDENTIFIER       avg
+  133   28:9       OPERATOR         =
+  134   28:11      PUNCTUATOR       (
+  135   28:12      KEYWORD          double
+  136   28:18      PUNCTUATOR       )
+  137   28:20      IDENTIFIER       total
+  138   28:26      OPERATOR         /
+  139   28:28      INTEGER_CONST    5
+  140   28:29      PUNCTUATOR       ;
+  141   29:5       KEYWORD          if
+  142   29:8       PUNCTUATOR       (
+  143   29:9       IDENTIFIER       avg
+  144   29:13      OPERATOR         >=
+  145   29:16      FLOAT_CONST      3.0
+  146   29:20      OPERATOR         &&
+  147   29:23      IDENTIFIER       grade
+  148   29:29      OPERATOR         !=
+  149   29:32      CHAR_CONST       'F'
+  150   29:35      PUNCTUATOR       )
+  151   30:9       IDENTIFIER       printf
+  152   30:15      PUNCTUATOR       (
+  153   30:16      STRING_LITERAL   "Average: %.2f\tScaled: %f\n"
+  154   30:45      PUNCTUATOR       ,
+  155   30:47      IDENTIFIER       avg
+  156   30:50      PUNCTUATOR       ,
+  157   30:52      IDENTIFIER       avg
+  158   30:56      OPERATOR         *
+  159   30:58      IDENTIFIER       scale
+  160   30:63      PUNCTUATOR       )
+  161   30:64      PUNCTUATOR       ;
+  162   31:5       IDENTIFIER       printf
+  163   31:11      PUNCTUATOR       (
+  164   31:12      STRING_LITERAL   "5! = %d, mask & perms = %d\n"
+  165   31:42      PUNCTUATOR       ,
+  166   31:44      IDENTIFIER       factorial
+  167   31:53      PUNCTUATOR       (
+  168   31:54      INTEGER_CONST    5
+  169   31:55      PUNCTUATOR       )
+  170   31:56      PUNCTUATOR       ,
+  171   31:58      IDENTIFIER       mask
+  172   31:63      OPERATOR         &
+  173   31:65      IDENTIFIER       perms
+  174   31:70      PUNCTUATOR       )
+  175   31:71      PUNCTUATOR       ;
+  176   32:5       KEYWORD          return
+  177   32:12      INTEGER_CONST    0
+  178   32:13      PUNCTUATOR       ;
+  179   33:1       PUNCTUATOR       }
+  --------------------------------------------------------------------
+  179 token(s)
+
+==[ SYMBOL TABLE (identifiers) ]====================================
+  #    IDENTIFIER                FIRST SEEN  COUNT  LINES
+  ----------------------------------------------------------------------
+  1    name                      7:10        1      7
+  2    marks                     8:11        1      8
+  3    Student                   9:3         1      9
+  4    factorial                 11:5        3      11, 14, 31
+  5    n                         11:19       4      11, 12, 14
+  6    main                      17:5        1      17
+  7    values                    18:9        3      18, 25, 26
+  8    MAX_SIZE                  18:16       1      18
+  9    total                     19:19       3      19, 25, 28
+  10   avg                       20:12       5      20, 28, 29, 30
+  11   scale                     20:23       2      20, 30
+  12   grade                     21:10       2      21, 29
+  13   newline                   21:23       1      21
+  14   mask                      22:9        2      22, 31
+  15   perms                     22:22       2      22, 31
+  16   i                         24:14       5      24, 25, 26
+  17   printf                    30:9        2      30, 31
+
+==[ TOKEN STATISTICS ]==============================================
+  KEYWORD             22  ###########
+  IDENTIFIER          39  ####################
+  INTEGER_CONST       18  #########
+  FLOAT_CONST          3  #
+  CHAR_CONST           3  #
+  STRING_LITERAL       2  #
+  OPERATOR            23  ############
+  PUNCTUATOR          67  ####################################
+  PREPROCESSOR         2  #
+  INVALID              0  
+  ----------------------
+  TOTAL              179
+
+==[ ERRORS & WARNINGS ]=============================================
+  [OK] No lexical errors or warnings found.

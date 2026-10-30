@@ -1,0 +1,973 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lexical Analyzer</title>
+<style>
+:root {
+  --bg: #f4f6f9; --panel: #ffffff; --panel-2: #f8f9fb; --border: #e2e6ec; --fg: #1b2230;
+  --muted: #687385; --accent: #2f6fed; --accent-soft: #e8efff;
+  --err: #d92d20; --err-soft: #fdecea; --warn: #b86e00; --warn-soft: #fff4e0;
+  --ok: #12805c; --ok-soft: #e4f6ee;
+  --t-kw: #a626a4; --t-id: #1f6fb2; --t-int: #b25d00; --t-flt: #c2410c; --t-chr: #2e8540;
+  --t-str: #3f7d20; --t-op: #5b6578; --t-pun: #7a8291; --t-pp: #0e7490; --t-inv: #d92d20;
+  --t-cm: #9aa3b2;
+  --mono: "Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace;
+  --sans: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1117; --panel: #151a22; --panel-2: #1a2029; --border: #262d39; --fg: #e4e8ef;
+    --muted: #8a94a6; --accent: #6d9eff; --accent-soft: #1c2944;
+    --err: #ff6b62; --err-soft: #3a1d1d; --warn: #f2b24c; --warn-soft: #382c16;
+    --ok: #3fcf8e; --ok-soft: #14301f;
+    --t-kw: #d38af0; --t-id: #6cb6ff; --t-int: #f0a35e; --t-flt: #ff9a6b; --t-chr: #8bd17c;
+    --t-str: #a5d6a7; --t-op: #aab4c4; --t-pun: #8790a0; --t-pp: #4fd1e0; --t-inv: #ff6b62;
+    --t-cm: #5f6b7d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1117; --panel: #151a22; --panel-2: #1a2029; --border: #262d39; --fg: #e4e8ef;
+  --muted: #8a94a6; --accent: #6d9eff; --accent-soft: #1c2944;
+  --err: #ff6b62; --err-soft: #3a1d1d; --warn: #f2b24c; --warn-soft: #382c16;
+  --ok: #3fcf8e; --ok-soft: #14301f;
+  --t-kw: #d38af0; --t-id: #6cb6ff; --t-int: #f0a35e; --t-flt: #ff9a6b; --t-chr: #8bd17c;
+  --t-str: #a5d6a7; --t-op: #aab4c4; --t-pun: #8790a0; --t-pp: #4fd1e0; --t-inv: #ff6b62;
+  --t-cm: #5f6b7d;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 var(--sans); }
+button, select, input { font: inherit; color: inherit; }
+
+/* ---------- header ---------- */
+header {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+.logo {
+  width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center;
+  background: var(--accent); color: #fff; font: 600 13px var(--mono);
+}
+.brand h1 { font-size: 16px; margin: 0; font-weight: 600; }
+.brand p { margin: 0; font-size: 12px; color: var(--muted); }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.btn {
+  border: 1px solid var(--border); background: var(--panel); border-radius: 7px;
+  padding: 6px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn svg { width: 15px; height: 15px; }
+select.btn { padding-right: 8px; }
+.toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; user-select: none; }
+.toggle input { accent-color: var(--accent); }
+kbd { font: 11px var(--mono); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; color: var(--muted); }
+
+/* ---------- summary strip ---------- */
+.summary {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch;
+  padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--panel-2);
+}
+.status {
+  display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 8px;
+  font-weight: 600; min-width: 190px;
+}
+.status.ok   { background: var(--ok-soft);  color: var(--ok); }
+.status.bad  { background: var(--err-soft); color: var(--err); }
+.status.warn { background: var(--warn-soft); color: var(--warn); }
+.status.idle { background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
+.status svg { width: 18px; height: 18px; flex: none; }
+.metric { padding: 4px 14px; border-left: 1px solid var(--border); }
+.metric b { display: block; font-size: 18px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.metric span { font-size: 12px; color: var(--muted); }
+
+/* ---------- main layout ---------- */
+main {
+  display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px;
+  padding: 16px 20px; height: calc(100vh - 140px); min-height: 520px;
+}
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.card-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--muted); }
+.card-head .name { color: var(--fg); font-weight: 600; margin-right: auto; }
+
+/* ---------- editor ---------- */
+.editor { position: relative; flex: 1; display: flex; min-height: 0; background: var(--panel); }
+.gutter {
+  flex: none; width: 52px; overflow: hidden; padding: 12px 0 60px; text-align: right;
+  background: var(--panel-2); border-right: 1px solid var(--border);
+  font: 13px/21px var(--mono); color: var(--t-cm); user-select: none;
+}
+.gutter div { padding-right: 10px; position: relative; height: 21px; }
+.gutter div.err, .gutter div.warn { cursor: pointer; font-weight: 600; }
+.gutter div.err  { color: var(--err); }
+.gutter div.warn { color: var(--warn); }
+.gutter div.err::before, .gutter div.warn::before {
+  content: ""; position: absolute; left: 8px; top: 7px; width: 7px; height: 7px; border-radius: 50%;
+}
+.gutter div.err::before  { background: var(--err); }
+.gutter div.warn::before { background: var(--warn); }
+.code { position: relative; flex: 1; min-width: 0; }
+.code pre, .code textarea {
+  position: absolute; inset: 0; margin: 0; border: 0; padding: 12px 16px;
+  font: 13px/21px var(--mono); letter-spacing: 0; tab-size: 4; white-space: pre; overflow-wrap: normal;
+}
+.code pre { overflow: hidden; pointer-events: none; color: var(--fg); }
+.code textarea {
+  resize: none; outline: none; background: transparent; color: transparent;
+  caret-color: var(--fg); overflow: auto;
+}
+.code textarea::selection { background: rgba(80, 130, 255, .28); color: transparent; }
+.code textarea::placeholder { color: var(--muted); }
+.drop .code::after {
+  content: "Drop a .c file to analyze"; position: absolute; inset: 8px; border: 2px dashed var(--accent);
+  border-radius: 8px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-weight: 600;
+}
+.statusbar {
+  display: flex; gap: 14px; align-items: center; padding: 5px 12px; border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--muted); background: var(--panel-2); min-height: 30px;
+}
+.statusbar .msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.statusbar .msg.err { color: var(--err); }
+.statusbar .msg.warn { color: var(--warn); }
+.spin { width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; visibility: hidden; }
+.busy .spin { visibility: visible; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* token colors (shared by editor, pills and bars) */
+.kw { color: var(--t-kw); } .id { color: var(--t-id); } .int { color: var(--t-int); } .flt { color: var(--t-flt); }
+.chr { color: var(--t-chr); } .str { color: var(--t-str); } .op { color: var(--t-op); } .pun { color: var(--t-pun); }
+.pp { color: var(--t-pp); } .inv { color: var(--t-inv); } .cm { color: var(--t-cm); }
+.code pre .inv { background: var(--err-soft); border-radius: 2px; }
+.u-err  { text-decoration: underline wavy var(--err);  text-decoration-skip-ink: none; text-underline-offset: 3px; }
+.u-warn { text-decoration: underline wavy var(--warn); text-decoration-skip-ink: none; text-underline-offset: 3px; }
+.flash { animation: flash 1s ease-out; }
+@keyframes flash { from { background: var(--accent-soft); } }
+
+/* ---------- results panel ---------- */
+.tabs { display: flex; gap: 2px; padding: 6px 8px 0; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tab {
+  border: 0; background: none; padding: 8px 12px; cursor: pointer; color: var(--muted);
+  border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; display: flex; gap: 6px; align-items: center;
+}
+.tab:hover { color: var(--fg); }
+.tab.active { color: var(--fg); border-bottom-color: var(--accent); font-weight: 600; }
+.count { font-size: 11px; padding: 0 6px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--border); font-weight: 600; font-variant-numeric: tabular-nums; }
+.count.err { background: var(--err); border-color: var(--err); color: #fff; }
+.pane { flex: 1; overflow: auto; padding: 14px; display: none; }
+.pane.active { display: block; }
+
+/* problems */
+.problem {
+  border: 1px solid var(--border); border-left: 4px solid var(--err); border-radius: 8px;
+  padding: 10px 12px; margin-bottom: 10px; cursor: pointer; background: var(--panel);
+}
+.problem.warning { border-left-color: var(--warn); }
+.problem:hover { border-color: var(--muted); }
+.problem.warning:hover { border-left-color: var(--warn); }
+.problem:not(.warning):hover { border-left-color: var(--err); }
+.p-top { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.code-tag { font: 600 12px var(--mono); padding: 1px 6px; border-radius: 4px; background: var(--err-soft); color: var(--err); }
+.warning .code-tag { background: var(--warn-soft); color: var(--warn); }
+.p-msg { font-weight: 600; flex: 1; min-width: 200px; }
+.p-loc { font: 12px var(--mono); color: var(--muted); }
+.p-src { margin: 8px 0 6px; padding: 6px 10px; background: var(--panel-2); border-radius: 6px; font: 12.5px/1.6 var(--mono); white-space: pre; overflow-x: auto; }
+.p-src .ln { color: var(--t-cm); margin-right: 10px; user-select: none; }
+.p-src mark { background: var(--err-soft); color: var(--err); text-decoration: underline wavy var(--err); text-underline-offset: 3px; border-radius: 2px; }
+.warning .p-src mark { background: var(--warn-soft); color: var(--warn); text-decoration-color: var(--warn); }
+.p-hint { font-size: 13px; color: var(--muted); display: flex; gap: 6px; }
+.p-hint b { color: var(--fg); font-weight: 600; }
+.empty { text-align: center; padding: 40px 20px; color: var(--muted); }
+.empty .big { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; margin: 0 auto 12px; background: var(--ok-soft); color: var(--ok); }
+.empty .big svg { width: 26px; height: 26px; }
+.empty h3 { margin: 0 0 4px; color: var(--fg); font-size: 16px; }
+
+/* tables */
+.filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
+.chip { border: 1px solid var(--border); background: var(--panel); border-radius: 14px; padding: 2px 10px; font-size: 12px; cursor: pointer; display: inline-flex; gap: 5px; align-items: center; }
+.chip.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.chip i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: inline-block; }
+.search { flex: 1; min-width: 140px; border: 1px solid var(--border); border-radius: 7px; padding: 5px 10px; background: var(--panel); outline: none; }
+.search:focus { border-color: var(--accent); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--border); position: sticky; top: -14px; background: var(--panel); }
+td { padding: 5px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr { cursor: pointer; }
+tbody tr:hover td { background: var(--panel-2); }
+.lex { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+.pill { font: 600 11px var(--mono); padding: 1px 7px; border-radius: 10px; border: 1px solid currentColor; white-space: nowrap; }
+.lines { font: 12px var(--mono); color: var(--muted); }
+
+/* statistics */
+.bars { display: grid; grid-template-columns: max-content 1fr max-content; gap: 8px 12px; align-items: center; }
+.bars .label { font-size: 13px; }
+.bar { height: 14px; border-radius: 4px; background: var(--panel-2); overflow: hidden; }
+.bar > div { height: 100%; background: currentColor; border-radius: 4px; transition: width .3s; }
+.bars .val { font: 600 13px var(--mono); text-align: right; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.tile { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.tile b { font-size: 22px; display: block; font-variant-numeric: tabular-nums; }
+.tile span { font-size: 12px; color: var(--muted); }
+h4 { margin: 18px 0 10px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+h4:first-child { margin-top: 0; }
+.ref td:first-child { white-space: nowrap; }
+
+.banner { display: none; margin: 12px 20px 0; padding: 10px 14px; border-radius: 8px; background: var(--err-soft); color: var(--err); font-size: 13px; }
+.banner.show { display: block; }
+.banner code { font-family: var(--mono); }
+
+@media (max-width: 980px) {
+  main { grid-template-columns: minmax(0, 1fr); height: auto; }
+  .card.editor-card { height: 60vh; min-height: 380px; }
+  .card.results { height: 70vh; }
+  header, .summary { padding-left: 16px; padding-right: 16px; }
+  main { padding: 16px; }
+  .metric { border-left: 0; padding: 4px 8px; }
+}
+
+/* ---------- workspace visual treatment ---------- */
+:root {
+  --bg: #f3f6fb;
+  --panel: #ffffff;
+  --panel-2: #f7f9fc;
+  --border: #dce4ef;
+  --fg: #172033;
+  --muted: #6d7a90;
+  --accent: #635bff;
+  --accent-soft: #eeedff;
+  --ok: #138a68;
+  --ok-soft: #e7f7f1;
+  --err: #d9485f;
+  --err-soft: #fff0f2;
+  --warn: #b87500;
+  --warn-soft: #fff7e6;
+}
+
+body {
+  background:
+    radial-gradient(circle at 8% -10%, rgba(99, 91, 255, .13), transparent 28rem),
+    var(--bg);
+}
+
+header {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  min-height: 76px;
+  padding: 14px 28px;
+  background: rgba(255, 255, 255, .9);
+  box-shadow: 0 1px 0 rgba(26, 38, 64, .06), 0 10px 30px rgba(34, 49, 80, .04);
+  backdrop-filter: blur(16px);
+}
+
+.brand { gap: 12px; }
+.logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #766eff, #5147d9);
+  box-shadow: 0 7px 16px rgba(99, 91, 255, .24);
+  font-size: 14px;
+}
+.brand h1 { font-size: 17px; letter-spacing: -.02em; }
+.brand p { margin-top: 2px; }
+.toolbar { gap: 7px; }
+.btn {
+  border-radius: 9px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, .74);
+  transition: border-color .16s, box-shadow .16s, transform .16s;
+}
+.btn:hover {
+  border-color: #b3bce0;
+  box-shadow: 0 4px 12px rgba(45, 59, 92, .08);
+  transform: translateY(-1px);
+}
+.btn.primary {
+  padding-left: 15px;
+  padding-right: 15px;
+  box-shadow: 0 6px 14px rgba(99, 91, 255, .23);
+}
+
+.summary {
+  gap: 0;
+  padding: 18px 28px;
+  background: transparent;
+  border-bottom: 0;
+}
+.status {
+  min-width: 205px;
+  margin-right: 12px;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+}
+.status.idle { border-color: var(--border); }
+.metric {
+  min-width: 108px;
+  padding: 2px 18px;
+  border-left: 1px solid var(--border);
+}
+.metric b { font-size: 21px; letter-spacing: -.03em; }
+
+main {
+  gap: 18px;
+  padding: 0 28px 28px;
+  height: calc(100vh - 164px);
+  min-height: 560px;
+}
+.card {
+  border-color: var(--border);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(39, 55, 88, .06);
+}
+.card-head {
+  min-height: 47px;
+  padding: 10px 15px;
+  background: linear-gradient(to bottom, #fff, #fbfcfe);
+}
+.card-head .name { font-size: 13px; }
+.card-head > span:last-child { font-size: 11px; }
+.editor { background: #fbfcfe; }
+.gutter { width: 58px; background: #f4f6fa; }
+.code pre, .code textarea { padding-left: 18px; padding-right: 18px; }
+.statusbar { min-height: 34px; padding-left: 15px; }
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 48px;
+  padding: 7px 9px 0;
+  background: #fbfcfe;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 7px 7px 0 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+}
+.tab:hover { color: var(--fg); background: var(--panel-2); }
+.tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: var(--accent-soft);
+}
+.count { background: #edf1f7; }
+.tab.active .count { background: rgba(99, 91, 255, .15); color: var(--accent); }
+.pane { padding: 16px; }
+.pane table { border-color: var(--border); }
+
+.problem {
+  border-radius: 10px;
+  border-left-width: 3px;
+  margin-bottom: 10px;
+  box-shadow: 0 3px 10px rgba(33, 48, 80, .04);
+}
+.empty { padding: 58px 24px; }
+.empty .big { color: var(--ok); }
+
+@media (max-width: 980px) {
+  header, .summary { padding-left: 16px; padding-right: 16px; }
+  main { padding: 0 16px 16px; }
+  .summary { gap: 8px; }
+  .status { margin-right: 0; }
+  .metric { min-width: 88px; padding: 4px 8px; }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0e1117;
+  --panel: #151a22;
+  --panel-2: #1a2029;
+  --border: #2b3443;
+  --fg: #e4e8ef;
+  --muted: #8f9bae;
+  --accent: #8f87ff;
+  --accent-soft: #28254e;
+  --ok: #45d29b;
+  --ok-soft: #153528;
+  --err: #ff746f;
+  --err-soft: #421f25;
+  --warn: #f2b24c;
+  --warn-soft: #3d2e16;
+}
+
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(circle at 8% -10%, rgba(116, 105, 255, .16), transparent 28rem),
+    var(--bg);
+}
+
+:root[data-theme="dark"] header {
+  background: rgba(21, 26, 34, .9);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .05), 0 10px 30px rgba(0, 0, 0, .2);
+}
+
+:root[data-theme="dark"] .btn {
+  background: rgba(21, 26, 34, .78);
+}
+
+:root[data-theme="dark"] .card-head,
+:root[data-theme="dark"] .tabs {
+  background: #171d26;
+}
+
+:root[data-theme="dark"] .editor {
+  background: #12171f;
+}
+
+:root[data-theme="dark"] .gutter {
+  background: #171d26;
+}
+
+:root[data-theme="dark"] .card {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .2);
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">Lx</div>
+    <div>
+      <h1>C-Like Language Lexical Analyzer</h1>
+      <p>Compiler Design Mini Project · tokens, symbol table &amp; error reporting</p>
+    </div>
+  </div>
+  <div class="toolbar">
+    <select class="btn" id="sample" title="Load a sample program">
+      <option value="">Load sample…</option>
+      <option value="valid">Valid C program</option>
+      <option value="errors">Program with lexical errors</option>
+      <option value="blank">Blank editor</option>
+    </select>
+    <button class="btn" id="open" title="Open a source file">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      Open file
+    </button>
+    <input type="file" id="file" accept=".c,.h,.cpp,.txt" hidden>
+    <button class="btn" id="export" title="Download the full plain-text report">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>
+      Export report
+    </button>
+    <label class="toggle" title="Re-analyze automatically while you type"><input type="checkbox" id="live" checked> Live</label>
+    <button class="btn primary" id="run" title="Analyze (Ctrl+Enter)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>
+      Analyze
+    </button>
+    <button class="btn" id="theme" title="Toggle light / dark theme" aria-label="Toggle theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="summary">
+  <div class="status idle" id="status">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
+    <span>Not analyzed yet</span>
+  </div>
+  <div class="metric"><b id="m-lines">0</b><span>Source lines</span></div>
+  <div class="metric"><b id="m-tokens">0</b><span>Tokens</span></div>
+  <div class="metric"><b id="m-ids">0</b><span>Identifiers</span></div>
+  <div class="metric"><b id="m-comments">0</b><span>Comments skipped</span></div>
+  <div class="metric"><b id="m-errors">0</b><span>Errors</span></div>
+  <div class="metric"><b id="m-warnings">0</b><span>Warnings</span></div>
+</div>
+
+<div class="banner" id="banner"></div>
+
+<main>
+  <section class="card editor-card" id="editorCard">
+    <div class="card-head"><span class="name" id="srcName">untitled.c</span><span>Ctrl+Enter to analyze · drop a file to open</span></div>
+    <div class="editor">
+      <div class="gutter" id="gutter"></div>
+      <div class="code">
+        <pre id="hl" aria-hidden="true"></pre>
+        <textarea id="src" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off" placeholder="Type or paste C code here…"></textarea>
+      </div>
+    </div>
+    <div class="statusbar" id="statusbar"><div class="spin"></div><span id="pos">Ln 1, Col 1</span><span class="msg" id="caretMsg"></span></div>
+  </section>
+
+  <section class="card results">
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="problems">Problems <span class="count" id="c-problems">0</span></button>
+      <button class="tab" data-tab="tokens">Token stream <span class="count" id="c-tokens">0</span></button>
+      <button class="tab" data-tab="symbols">Symbol table <span class="count" id="c-symbols">0</span></button>
+      <button class="tab" data-tab="stats">Statistics</button>
+      <button class="tab" data-tab="ref">Reference</button>
+    </div>
+    <div class="pane active" id="pane-problems"></div>
+    <div class="pane" id="pane-tokens">
+      <div class="filters" id="tokFilters"></div>
+      <table><thead><tr><th class="num">#</th><th>Type</th><th>Lexeme</th><th class="num">Line</th><th class="num">Col</th></tr></thead><tbody id="tokBody"></tbody></table>
+    </div>
+    <div class="pane" id="pane-symbols">
+      <table><thead><tr><th class="num">#</th><th>Identifier</th><th>First seen</th><th class="num">Uses</th><th>Lines</th></tr></thead><tbody id="symBody"></tbody></table>
+    </div>
+    <div class="pane" id="pane-stats"></div>
+    <div class="pane" id="pane-ref"></div>
+  </section>
+</main>
+
+<script>
+// Token classes as named by the C++ lexer (tokenTypeName), with a CSS class and label.
+const TYPES = [
+  ["KEYWORD", "kw", "Keyword"], ["IDENTIFIER", "id", "Identifier"],
+  ["INTEGER_CONST", "int", "Integer constant"], ["FLOAT_CONST", "flt", "Float constant"],
+  ["CHAR_CONST", "chr", "Char constant"], ["STRING_LITERAL", "str", "String literal"],
+  ["OPERATOR", "op", "Operator"], ["PUNCTUATOR", "pun", "Punctuator"],
+  ["PREPROCESSOR", "pp", "Preprocessor"], ["INVALID", "inv", "Invalid"],
+];
+const CLS = Object.fromEntries(TYPES.map(([t, c]) => [t, c]));
+const LABEL = Object.fromEntries(TYPES.map(([t, , l]) => [t, l]));
+
+const ERROR_CODES = [
+  ["E101", "Invalid character in source (e.g. @ $ ` or non-ASCII)"],
+  ["E102", "Unterminated string literal"],
+  ["E103", "Unterminated character constant"],
+  ["E104", "Unterminated block comment"],
+  ["E105", "Malformed number (bad suffix, 2+ decimal points, bad octal, empty exponent/hex)"],
+  ["E106", "Invalid escape sequence inside a literal"],
+  ["E107", "Empty character constant ''"],
+  ["E108", "Identifier longer than 31 characters"],
+  ["E109", "Multi-character character constant"],
+  ["E110", "Integer constant too large"],
+  ["E111", "Unknown preprocessor directive"],
+  ["W201", "Unmatched or mismatched closing bracket"],
+  ["W202", "Opening bracket never closed"],
+  ["W203", "'/*' inside a block comment (comments do not nest)"],
+];
+
+const $ = (id) => document.getElementById(id);
+const ta = $("src"), hl = $("hl"), gutter = $("gutter");
+const ICON_OK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>';
+const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6m0 3.5v.5"/></svg>';
+
+let result = null;        // last JSON from the lexer
+let resultCode = "";      // the source that produced it
+let tokFilter = null, tokSearch = "";
+let samples = null, seq = 0, timer = 0;
+
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const visible = (s) => s.replace(/\n/g, "\\n").replace(/\t/g, "\\t");
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+
+// ---------------------------------------------------------------------
+//  Talking to the C++ lexer through server.py
+// ---------------------------------------------------------------------
+async function post(path, code) {
+  const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+  return res;
+}
+
+async function analyze() {
+  const code = ta.value, my = ++seq;
+  document.body.classList.add("busy");
+  try {
+    const data = await (await post("/api/analyze", code)).json();
+    if (my !== seq) return;
+    if (data.error) throw new Error(data.error);
+    result = data; resultCode = code;
+    $("banner").classList.remove("show");
+    renderAll();
+  } catch (e) {
+    if (my !== seq) return;
+    showBanner(e);
+  } finally {
+    if (my === seq) document.body.classList.remove("busy");
+  }
+}
+
+function showBanner(e) {
+  const offline = location.protocol === "file:" || e instanceof TypeError;
+  $("banner").innerHTML = offline
+    ? "Cannot reach the analyzer. Start the UI with <code>run_ui.bat</code> (or <code>python ui/server.py</code>) and open <code>http://localhost:8000</code>."
+    : "Analyzer error: " + esc(String(e.message || e));
+  $("banner").classList.add("show");
+}
+
+async function exportReport() {
+  try {
+    const res = await post("/api/report", ta.value);
+    if (!res.ok) throw new Error((await res.json()).error);
+    const url = URL.createObjectURL(await res.blob());
+    const a = Object.assign(document.createElement("a"), { href: url, download: "lexer_report.txt" });
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) { showBanner(e); }
+}
+
+// ---------------------------------------------------------------------
+//  Positions: the lexer counts columns in characters (code points)
+// ---------------------------------------------------------------------
+function offsetOf(code, line, col) {
+  let off = 0;
+  for (let l = 1; l < line; l++) {
+    const nl = code.indexOf("\n", off);
+    if (nl < 0) return code.length;
+    off = nl + 1;
+  }
+  const end = code.indexOf("\n", off) < 0 ? code.length : code.indexOf("\n", off);
+  const chars = Array.from(code.slice(off, end));
+  return off + chars.slice(0, col - 1).join("").length;
+}
+
+function jumpTo(line, col, len) {
+  const start = offsetOf(ta.value, line, col);
+  const lineEnd = ta.value.indexOf("\n", start) < 0 ? ta.value.length : ta.value.indexOf("\n", start);
+  const end = Math.min(offsetOf(ta.value, line, col + Math.max(1, len)), lineEnd);
+  ta.focus();
+  ta.setSelectionRange(start, Math.max(start, end));
+  ta.scrollTop = Math.max(0, (line - 1) * 21 - ta.clientHeight / 3);
+  syncScroll(); updateCaret();
+}
+
+// ---------------------------------------------------------------------
+//  Editor: colour each character from the token stream
+// ---------------------------------------------------------------------
+function renderEditor() {
+  const lines = ta.value.split("\n");
+  const marks = lines.map((l) => new Array(Array.from(l).length + 1).fill(""));
+  const under = lines.map((l) => new Array(Array.from(l).length + 1).fill(""));
+  const gutterMarks = {};
+
+  const resultLines = resultCode.split("\n");
+  if (result) {
+    for (const t of result.tokens) {
+      if (t.type === "END_OF_FILE" || t.type === "EOF" || !marks[t.line - 1]) continue;
+      if (resultLines[t.line - 1] !== lines[t.line - 1]) continue;   // line edited since last run
+      const row = marks[t.line - 1], n = Array.from(t.lexeme).length;
+      for (let i = t.column - 1; i < Math.min(row.length - 1, t.column - 1 + n); i++) row[i] = CLS[t.type] || "";
+    }
+    for (const d of result.diagnostics) {
+      const row = under[d.line - 1];
+      if (!row) continue;
+      const kind = d.severity === "error" ? "err" : "warn";
+      for (let i = d.column - 1; i < Math.min(row.length, d.column - 1 + d.length); i++) {
+        if (row[i] !== "err") row[i] = kind;
+      }
+      const g = gutterMarks[d.line] || (gutterMarks[d.line] = { kind, msgs: [] });
+      if (kind === "err") g.kind = "err";
+      g.msgs.push(`${d.code}: ${d.message}`);
+    }
+  }
+
+  let html = "";
+  lines.forEach((line, li) => {
+    const chars = Array.from(line);
+    const resultLine = result && resultLines[li] === line;
+    let cur = null, buf = "";
+    const flush = () => {
+      if (!buf) return;
+      const [tc, uc] = cur.split("|");
+      const cls = [tc, uc ? "u-" + uc : ""].filter(Boolean).join(" ");
+      html += cls ? `<span class="${cls}">${esc(buf)}</span>` : esc(buf);
+      buf = "";
+    };
+    // Underlines that run past the end of the line (e.g. at a missing quote) get a placeholder space.
+    const width = Math.max(chars.length, under[li].findLastIndex((u) => u) + 1);
+    for (let i = 0; i < width; i++) {
+      const ch = chars[i] ?? " ";
+      let tc = marks[li][i] || "";
+      if (!tc && resultLine && ch.trim()) tc = "cm";      // not part of any token => comment
+      const key = tc + "|" + (under[li][i] || "");
+      if (key !== cur) { flush(); cur = key; }
+      buf += ch;
+    }
+    flush();
+    html += "\n";
+  });
+  hl.innerHTML = html + "\n";
+
+  gutter.innerHTML = lines.map((_, i) => {
+    const g = gutterMarks[i + 1];
+    return g ? `<div class="${g.kind}" data-line="${i + 1}" title="${esc(g.msgs.join("\n"))}">${i + 1}</div>` : `<div>${i + 1}</div>`;
+  }).join("");
+  syncScroll();
+}
+
+function syncScroll() {
+  hl.scrollTop = ta.scrollTop; hl.scrollLeft = ta.scrollLeft;
+  gutter.scrollTop = ta.scrollTop;
+}
+
+function updateCaret() {
+  const before = ta.value.slice(0, ta.selectionStart).split("\n");
+  const line = before.length, col = Array.from(before[before.length - 1]).length + 1;
+  $("pos").textContent = `Ln ${line}, Col ${col}`;
+  const msg = $("caretMsg");
+  const d = result && result.diagnostics.find((d) => d.line === line && col >= d.column && col <= d.column + d.length);
+  const onLine = d || (result && result.diagnostics.find((d) => d.line === line));
+  if (onLine) {
+    msg.className = "msg " + (onLine.severity === "error" ? "err" : "warn");
+    msg.textContent = `${onLine.code}  ${onLine.message}`;
+  } else { msg.className = "msg"; msg.textContent = ""; }
+}
+
+// ---------------------------------------------------------------------
+//  Result panels
+// ---------------------------------------------------------------------
+function renderAll() {
+  renderEditor(); renderSummary(); renderProblems(); renderTokens(); renderSymbols(); renderStats(); updateCaret();
+}
+
+function renderSummary() {
+  const r = result, st = $("status");
+  const lines = resultCode.split("\n").length - (resultCode.endsWith("\n") ? 1 : 0);
+  $("m-lines").textContent = Math.max(lines, 0);
+  $("m-tokens").textContent = r.tokens.length - 1;            // excluding EOF
+  $("m-ids").textContent = r.symbols.length;
+  $("m-comments").textContent = r.comments;
+  $("m-errors").textContent = r.errors;
+  $("m-warnings").textContent = r.warnings;
+  $("m-errors").style.color = r.errors ? "var(--err)" : "";
+  $("m-warnings").style.color = r.warnings ? "var(--warn)" : "";
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  if (r.errors) {
+    st.className = "status bad";
+    st.innerHTML = ICON_X + `<span>${plural(r.errors, "error")}${r.warnings ? " · " + plural(r.warnings, "warning") : ""}</span>`;
+  } else if (r.warnings) {
+    st.className = "status warn";
+    st.innerHTML = ICON_X + `<span>No errors · ${plural(r.warnings, "warning")}</span>`;
+  } else {
+    st.className = "status ok";
+    st.innerHTML = ICON_OK + "<span>No lexical errors</span>";
+  }
+  const cp = $("c-problems");
+  cp.textContent = r.diagnostics.length;
+  cp.className = "count" + (r.errors ? " err" : "");
+  $("c-tokens").textContent = r.tokens.length - 1;
+  $("c-symbols").textContent = r.symbols.length;
+}
+
+function renderProblems() {
+  const pane = $("pane-problems"), r = result;
+  if (!r.diagnostics.length) {
+    pane.innerHTML = `<div class="empty"><div class="big">${ICON_OK}</div><h3>No lexical errors</h3>
+      <div>${r.tokens.length - 1} tokens recognised. See the token stream and symbol table tabs.</div></div>`;
+    return;
+  }
+  const src = resultCode.split("\n");
+  pane.innerHTML = r.diagnostics.map((d, i) => {
+    const chars = Array.from(src[d.line - 1] ?? "");
+    const a = d.column - 1, b = a + d.length;
+    const pre = chars.slice(0, a).join(""), mid = chars.slice(a, b).join("") || " ", post = chars.slice(b).join("");
+    return `<div class="problem ${d.severity}" data-i="${i}">
+      <div class="p-top"><span class="code-tag">${d.code}</span><span class="p-msg">${esc(d.message)}</span>
+      <span class="p-loc">Ln ${d.line}, Col ${d.column}</span></div>
+      <div class="p-src"><span class="ln">${d.line}</span>${esc(pre)}<mark>${esc(mid)}</mark>${esc(post)}</div>
+      <div class="p-hint"><b>Hint:</b> ${esc(d.hint)}</div></div>`;
+  }).join("");
+}
+
+function renderTokens() {
+  const r = result, counts = {};
+  for (const t of r.tokens) counts[t.type] = (counts[t.type] || 0) + 1;
+  $("tokFilters").innerHTML =
+    `<button class="chip ${tokFilter ? "" : "active"}" data-type="">All ${r.tokens.length - 1}</button>` +
+    TYPES.filter(([t]) => counts[t]).map(([t, c, l]) =>
+      `<button class="chip ${tokFilter === t ? "active" : ""}" data-type="${t}"><i class="${c}"></i>${l} ${counts[t]}</button>`).join("") +
+    `<input class="search" id="tokSearch" placeholder="Search lexeme…" value="${esc(tokSearch)}">`;
+  $("tokSearch").addEventListener("input", (e) => { tokSearch = e.target.value; renderTokenRows(); });
+  renderTokenRows();
+}
+
+function renderTokenRows() {
+  const q = tokSearch.toLowerCase();
+  const rows = [];
+  result.tokens.forEach((t, i) => {
+    if (t.type === "EOF") return;
+    if (tokFilter && t.type !== tokFilter) return;
+    if (q && !t.lexeme.toLowerCase().includes(q)) return;
+    rows.push(`<tr data-line="${t.line}" data-col="${t.column}" data-len="${Array.from(t.lexeme).length}">
+      <td class="num lines">${i + 1}</td><td><span class="pill ${CLS[t.type]}">${t.type}</span></td>
+      <td class="lex ${CLS[t.type]}">${esc(visible(t.lexeme))}</td><td class="num">${t.line}</td><td class="num">${t.column}</td></tr>`);
+  });
+  $("tokBody").innerHTML = rows.join("") || `<tr><td colspan="5" class="empty">No matching tokens</td></tr>`;
+}
+
+function renderSymbols() {
+  const body = $("symBody");
+  body.innerHTML = result.symbols.map((s, i) => `<tr data-line="${s.firstLine}" data-col="${s.firstColumn}" data-len="${Array.from(s.name).length}">
+    <td class="num lines">${i + 1}</td><td class="lex id">${esc(s.name)}</td>
+    <td class="lines">Ln ${s.firstLine}, Col ${s.firstColumn}</td><td class="num">${s.occurrences}</td>
+    <td class="lines">${s.lines.join(", ")}</td></tr>`).join("") ||
+    `<tr><td colspan="5" class="empty">No identifiers found</td></tr>`;
+}
+
+function renderStats() {
+  const r = result, counts = {};
+  for (const t of r.tokens) counts[t.type] = (counts[t.type] || 0) + 1;
+  const total = r.tokens.length - 1, max = Math.max(1, ...TYPES.map(([t]) => counts[t] || 0));
+  const kwUsed = new Set(r.tokens.filter((t) => t.type === "KEYWORD").map((t) => t.lexeme)).size;
+  $("pane-stats").innerHTML = `
+    <div class="tiles">
+      <div class="tile"><b>${total}</b><span>Total tokens</span></div>
+      <div class="tile"><b>${r.symbols.length}</b><span>Distinct identifiers</span></div>
+      <div class="tile"><b>${kwUsed}</b><span>Distinct keywords</span></div>
+      <div class="tile"><b>${r.comments}</b><span>Comments skipped</span></div>
+    </div>
+    <h4>Tokens by class</h4>
+    <div class="bars">${TYPES.map(([t, c, l]) => {
+      const n = counts[t] || 0;
+      return `<span class="label">${l}</span><div class="bar ${c}"><div style="width:${(n / max) * 100}%"></div></div>
+        <span class="val">${n}<span class="lines"> · ${total ? Math.round((n / total) * 100) : 0}%</span></span>`;
+    }).join("")}</div>`;
+}
+
+function renderReference() {
+  $("pane-ref").innerHTML = `
+    <h4>Error codes</h4>
+    <table class="ref"><tbody>${ERROR_CODES.map(([c, t]) =>
+      `<tr><td><span class="code-tag" style="${c[0] === "W" ? "background:var(--warn-soft);color:var(--warn)" : ""}">${c}</span></td><td>${esc(t)}</td></tr>`).join("")}</tbody></table>
+    <h4>Token classes</h4>
+    <table class="ref"><tbody>
+      <tr><td><span class="pill kw">KEYWORD</span></td><td class="lex">int char float double if else for while return struct typedef …</td></tr>
+      <tr><td><span class="pill id">IDENTIFIER</span></td><td>Letter or _ followed by letters, digits or _ (max 31 characters)</td></tr>
+      <tr><td><span class="pill int">INTEGER_CONST</span></td><td class="lex">42  0755  0x1F  10U  20L  30UL  40LL</td></tr>
+      <tr><td><span class="pill flt">FLOAT_CONST</span></td><td class="lex">3.14  .5  6.02e23  1.5E-3  2.0f</td></tr>
+      <tr><td><span class="pill chr">CHAR_CONST</span></td><td class="lex">'a'  '\\n'  '\\x41'  '\\101'</td></tr>
+      <tr><td><span class="pill str">STRING_LITERAL</span></td><td class="lex">"Hello, World\\n"</td></tr>
+      <tr><td><span class="pill op">OPERATOR</span></td><td class="lex">&lt;&lt;= &gt;&gt;= ++ -- -&gt; += == != &amp;&amp; || + - * / % = &lt; &gt; ! ~ ? :</td></tr>
+      <tr><td><span class="pill pun">PUNCTUATOR</span></td><td class="lex">( ) { } [ ] ; , ...</td></tr>
+      <tr><td><span class="pill pp">PREPROCESSOR</span></td><td class="lex">#include  #define  #ifdef  #endif …</td></tr>
+    </tbody></table>`;
+}
+
+// ---------------------------------------------------------------------
+//  Wiring
+// ---------------------------------------------------------------------
+function setCode(code, name) {
+  ta.value = code;
+  $("srcName").textContent = name;
+  store.set("lexer.code", code); store.set("lexer.name", name);
+  ta.scrollTop = 0; ta.setSelectionRange(0, 0);
+  renderEditor();
+  analyze();
+}
+
+function scheduleAnalyze() {
+  store.set("lexer.code", ta.value);
+  renderEditor();
+  clearTimeout(timer);
+  if ($("live").checked) timer = setTimeout(analyze, 200);
+}
+
+ta.addEventListener("input", scheduleAnalyze);
+ta.addEventListener("scroll", syncScroll);
+["keyup", "click", "select"].forEach((e) => ta.addEventListener(e, updateCaret));
+ta.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); analyze(); }
+  else if (e.key === "Tab" && !e.shiftKey) { e.preventDefault(); document.execCommand("insertText", false, "    "); }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && e.target !== ta) { e.preventDefault(); analyze(); }
+});
+
+$("run").addEventListener("click", analyze);
+$("export").addEventListener("click", exportReport);
+$("live").addEventListener("change", (e) => { store.set("lexer.live", e.target.checked ? "1" : "0"); if (e.target.checked) analyze(); });
+$("open").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) readFile(f); e.target.value = ""; });
+
+function readFile(f) { f.text().then((t) => setCode(t.replace(/\r/g, ""), f.name)); }
+
+$("sample").addEventListener("change", async (e) => {
+  const v = e.target.value;
+  e.target.value = "";
+  if (v === "blank") return setCode("", "untitled.c");
+  try {
+    samples = samples || await (await fetch("/api/samples")).json();
+    setCode(samples[v], v === "valid" ? "valid_program.c" : "program_with_errors.c");
+  } catch (err) { showBanner(err); }
+});
+
+const card = $("editorCard");
+card.addEventListener("dragover", (e) => { e.preventDefault(); card.classList.add("drop"); });
+card.addEventListener("dragleave", (e) => { if (!card.contains(e.relatedTarget)) card.classList.remove("drop"); });
+card.addEventListener("drop", (e) => {
+  e.preventDefault(); card.classList.remove("drop");
+  const f = e.dataTransfer.files[0];
+  if (f) readFile(f);
+});
+
+document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => selectTab(tab.dataset.tab)));
+function selectTab(name) {
+  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
+  document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("active", p.id === "pane-" + name));
+  store.set("lexer.tab", name);
+}
+
+$("pane-problems").addEventListener("click", (e) => {
+  const p = e.target.closest(".problem");
+  if (!p) return;
+  const d = result.diagnostics[+p.dataset.i];
+  jumpTo(d.line, d.column, d.length);
+});
+for (const id of ["tokBody", "symBody"]) {
+  $(id).addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-line]");
+    if (tr) jumpTo(+tr.dataset.line, +tr.dataset.col, +tr.dataset.len);
+  });
+}
+$("tokFilters").addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  tokFilter = chip.dataset.type || null;
+  renderTokens();
+});
+gutter.addEventListener("click", (e) => {
+  const g = e.target.closest("[data-line]");
+  if (!g) return;
+  const d = result.diagnostics.find((d) => d.line === +g.dataset.line);
+  selectTab("problems");
+  jumpTo(d.line, d.column, d.length);
+  const el = $("pane-problems").querySelector(`[data-i="${result.diagnostics.indexOf(d)}"]`);
+  if (el) { el.scrollIntoView({ block: "nearest" }); el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash"); }
+});
+
+$("theme").addEventListener("click", () => {
+  const dark = getComputedStyle(document.documentElement).colorScheme === "dark";
+  document.documentElement.dataset.theme = dark ? "light" : "dark";
+  store.set("lexer.theme", document.documentElement.dataset.theme);
+});
+
+// ---------------------------------------------------------------------
+//  Start-up
+// ---------------------------------------------------------------------
+(async function init() {
+  const theme = store.get("lexer.theme");
+  if (theme) document.documentElement.dataset.theme = theme;
+  if (store.get("lexer.live") === "0") $("live").checked = false;
+  renderReference();
+  selectTab(store.get("lexer.tab") || "problems");
+
+  const saved = store.get("lexer.code");
+  if (saved !== null) { setCode(saved, store.get("lexer.name") || "untitled.c"); return; }
+  try {
+    samples = await (await fetch("/api/samples")).json();
+    setCode(samples.errors, "program_with_errors.c");
+  } catch (err) { renderEditor(); showBanner(err); }
+})();
+</script>
+</body>
+</html>
